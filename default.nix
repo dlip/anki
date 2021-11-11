@@ -14,6 +14,19 @@ let
     # '';
   };
 
+  # Patch the protoc alias so that it always builds from source.
+  rulesProto = pkgs.fetchFromGitHub {
+    owner = "bazelbuild";
+    repo = "rules_proto";
+    rev = "f7a30f6f80006b591fa7c437fe5a951eb10bcbcf";
+    sha256 = "10bcw0ir0skk7h33lmqm38n9w4nfs24mwajnngkbs6jb5wsvkqv8";
+    extraPostFetch = ''
+      sed -i 's|name = "protoc"|name = "_protoc_original"|' $out/proto/private/BUILD.release
+      cat <<EOF >>$out/proto/private/BUILD.release
+      alias(name = "protoc", actual = "@com_github_protocolbuffers_protobuf//:protoc", visibility = ["//visibility:public"])
+      EOF
+    '';
+  };
   myPython = pkgs.python3.withPackages (pkgs: with pkgs; [ pip pyqt5 pyliblo pyxdg ]);
 in
 with pkgs; (buildBazelPackage {
@@ -30,6 +43,8 @@ with pkgs; (buildBazelPackage {
   nativeBuildInputs = [
     git # needed to fetch the bazel deps (protobuf in particular)
     myPython
+    nodejs
+    yarn
   ];
 
   bazelTarget = "//qt:runanki_qt515";
@@ -38,22 +53,13 @@ with pkgs; (buildBazelPackage {
     sha256 = "09dzxs2v5wpiaxrz7qj257q1fbx0gxwbk0jyx58n81m5kys7yj9k";
   };
 
-  # bazelFlags = [
-  #   "--override_repository=rules_python=${rulesPython}"
-  # ];
+  bazelFlags = [
+    "--override_repository=rules_proto=${rulesProto}"
+  ];
 
   buildAttrs = {
     preBuild = ''
-      alias python=python3
       patchShebangs .
-    '';
-
-    installPhase = ''
-      # do not generate a wheel, instead just copy the generated files to $out to be installed by buildPythonPackage
-      sed -i 's,.*bdist_wheel.*,cp -rL . "$out"; exit 0,' bazel-bin/install
-
-      # the target directory "dist" does not actually matter since we're not generating a wheel
-      bazel-bin/install dist
     '';
   };
 })

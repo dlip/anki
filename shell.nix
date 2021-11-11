@@ -14,4 +14,5 @@ in
     #which
     #myPython
   ];
+  PYO3_PYTHON = "${myPython}/bin/python3";
 }).env
